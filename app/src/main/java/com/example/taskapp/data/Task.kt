@@ -4,9 +4,9 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 enum class Priority(val label: String) {
-    LOW("Baja"),
-    MEDIUM("Media"),
-    HIGH("Alta")
+    LOW("Low"),
+    MEDIUM("Medium"),
+    HIGH("High")
 }
 
 @Entity(tableName = "tasks")

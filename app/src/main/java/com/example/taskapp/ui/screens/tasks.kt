@@ -20,7 +20,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -41,6 +40,7 @@ fun TasksScreen(viewModel: TaskViewModel) {
 
     val allHabits by viewModel.allHabits.collectAsState()
     val allHabitLogs by viewModel.allHabitLogs.collectAsState()
+    val overallDailyStreak by viewModel.overallDailyStreak.collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
     var showHabitDialog by remember { mutableStateOf(false) }
@@ -56,7 +56,7 @@ fun TasksScreen(viewModel: TaskViewModel) {
                     showDialog = true
                 }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar Tarea")
+                Icon(Icons.Default.Add, contentDescription = "Add Task")
             }
         }
     ) { innerPadding ->
@@ -65,22 +65,32 @@ fun TasksScreen(viewModel: TaskViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Habit Tracker Header Bar
+            // Overall Daily Streak Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = Color(0xFFFF6D00))
+                    Icon(
+                        imageVector = Icons.Default.LocalFireDepartment,
+                        contentDescription = "Daily Streak",
+                        tint = MaterialTheme.colorScheme.primary, // Black in Light Mode, White in Dark Mode
+                        modifier = Modifier.size(22.dp)
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Hábitos Diarios y Rachas", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = "Daily Streak: $overallDailyStreak Days",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
 
                 IconButton(onClick = { showHabitDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar Hábito")
+                    Icon(Icons.Default.Add, contentDescription = "Add Habit")
                 }
             }
 
@@ -116,8 +126,7 @@ fun TasksScreen(viewModel: TaskViewModel) {
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(habit.title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Icon(Icons.Default.LocalFireDepartment, contentDescription = null, tint = Color(0xFFFF6D00), modifier = Modifier.size(14.dp))
-                                Text("$streak", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF6D00))
+                                Text("$streak d", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -135,12 +144,12 @@ fun TasksScreen(viewModel: TaskViewModel) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { viewModel.searchQuery.value = it },
-                    placeholder = { Text("Buscar tareas...") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
+                    placeholder = { Text("Search tasks...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
                     trailingIcon = {
                         if (searchQuery.isNotBlank()) {
                             IconButton(onClick = { viewModel.searchQuery.value = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Limpiar búsqueda")
+                                Icon(Icons.Default.Clear, contentDescription = "Clear search")
                             }
                         }
                     },
@@ -154,7 +163,7 @@ fun TasksScreen(viewModel: TaskViewModel) {
                 ) {
                     Icon(
                         Icons.Default.DeleteSweep,
-                        contentDescription = "Limpiar completadas",
+                        contentDescription = "Clear completed",
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -202,8 +211,8 @@ fun TasksScreen(viewModel: TaskViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (searchQuery.isNotBlank()) "No se encontraron tareas." else "No tienes tareas registradas.\nPresiona + para crear una.",
-                            fontSize = 15.sp,
+                            text = if (searchQuery.isNotBlank()) "No tasks found." else "No tasks recorded.\nTap + to create one.",
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -272,17 +281,17 @@ fun AddHabitDialog(
     onConfirm: (title: String, category: String) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Salud") }
+    var category by remember { mutableStateOf("Health") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nuevo Hábito Diario") },
+        title = { Text("New Daily Habit") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Nombre (ej. Tomar 2L agua, Leer 15m)") },
+                    label = { Text("Habit Name (e.g. Drink 2L water, Read 15m)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -293,12 +302,12 @@ fun AddHabitDialog(
                 onClick = { onConfirm(title, category) },
                 enabled = title.isNotBlank()
             ) {
-                Text("Guardar")
+                Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )
@@ -311,7 +320,7 @@ fun TaskItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.US) }
     val formattedDate = dateFormat.format(Date(task.dateMillis))
 
     val todayStartMillis = remember { TaskViewModel.getStartOfDay(System.currentTimeMillis()) }
@@ -319,7 +328,7 @@ fun TaskItemCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (task.isCompleted)
                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -348,7 +357,7 @@ fun TaskItemCard(
                 ) {
                     Text(
                         text = task.title,
-                        fontSize = 17.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                         color = if (task.isCompleted)
@@ -369,7 +378,7 @@ fun TaskItemCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = task.description,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -381,7 +390,7 @@ fun TaskItemCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Fecha: $formattedDate",
+                        text = "Due: $formattedDate",
                         fontSize = 12.sp,
                         color = if (isOverdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                         fontWeight = if (isOverdue) FontWeight.Bold else FontWeight.Normal
@@ -393,7 +402,7 @@ fun TaskItemCard(
                             shape = RoundedCornerShape(4.dp)
                         ) {
                             Text(
-                                text = "Vencida",
+                                text = "Overdue",
                                 fontSize = 10.sp,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -405,12 +414,12 @@ fun TaskItemCard(
             }
 
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Editar Tarea")
+                Icon(Icons.Default.Edit, contentDescription = "Edit Task")
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Eliminar Tarea",
+                    contentDescription = "Delete Task",
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -420,21 +429,15 @@ fun TaskItemCard(
 
 @Composable
 fun PriorityBadge(priority: Priority) {
-    val (backgroundColor, textColor) = when (priority) {
-        Priority.HIGH -> Pair(Color(0xFFFFCDD2), Color(0xFFB71C1C)) // Light red / dark red
-        Priority.MEDIUM -> Pair(Color(0xFFFFE0B2), Color(0xFFE65100)) // Light orange / dark orange
-        Priority.LOW -> Pair(Color(0xFFE8F5E9), Color(0xFF1B5E20)) // Light green / dark green
-    }
-
     Surface(
-        color = backgroundColor,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(12.dp)
     ) {
         Text(
             text = priority.label,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = textColor,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
         )
     }
@@ -472,11 +475,11 @@ fun TaskDialog(
 
     var showDatePicker by remember { mutableStateOf(false) }
 
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.US) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (task == null) "Nueva Tarea" else "Editar Tarea") },
+        title = { Text(if (task == null) "New Task" else "Edit Task") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -485,7 +488,7 @@ fun TaskDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Título") },
+                    label = { Text("Title") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -493,7 +496,7 @@ fun TaskDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("Descripción") },
+                    label = { Text("Description") },
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -503,14 +506,16 @@ fun TaskDialog(
                     onClick = { showDatePicker = true },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Fecha: ${dateFormat.format(Date(selectedDateMillis))}")
+                    Text("Date: ${dateFormat.format(Date(selectedDateMillis))}")
                 }
 
                 // Priority Selection
-                Text("Prioridad:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Row(
+                Text("Priority:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Priority.entries.forEach { priority ->
                         FilterChip(
@@ -522,12 +527,12 @@ fun TaskDialog(
                 }
 
                 // Category Selection
-                Text("Categoría:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Category:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(listOf("General", "Trabajo", "Personal", "Estudios", "Hogar")) { category ->
+                    items(listOf("General", "Work", "Personal", "Study", "Home")) { category ->
                         FilterChip(
                             selected = selectedCategory == category,
                             onClick = { selectedCategory = category },
@@ -542,12 +547,12 @@ fun TaskDialog(
                 onClick = { onConfirm(title, description, selectedDateMillis, selectedPriority, selectedCategory) },
                 enabled = title.isNotBlank()
             ) {
-                Text("Guardar")
+                Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )
@@ -567,12 +572,12 @@ fun TaskDialog(
                         showDatePicker = false
                     }
                 ) {
-                    Text("Aceptar")
+                    Text("OK")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancelar")
+                    Text("Cancel")
                 }
             }
         ) {

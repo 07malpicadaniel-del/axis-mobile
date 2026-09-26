@@ -10,5 +10,5 @@ data class SavingGoal(
     val title: String,
     val targetAmount: Double,
     val currentAmount: Double = 0.0,
-    val colorHex: String = "#4CAF50"
+    val colorHex: String = "#212121"
 )

@@ -14,9 +14,10 @@ import androidx.room.TypeConverters
         Habit::class,
         HabitLog::class,
         DailyNote::class,
-        SavingGoal::class
+        SavingGoal::class,
+        GymExercise::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -27,6 +28,7 @@ abstract class TaskDatabase : RoomDatabase() {
     abstract fun habitDao(): HabitDao
     abstract fun dailyNoteDao(): DailyNoteDao
     abstract fun savingGoalDao(): SavingGoalDao
+    abstract fun gymExerciseDao(): GymExerciseDao
 
     companion object {
         @Volatile

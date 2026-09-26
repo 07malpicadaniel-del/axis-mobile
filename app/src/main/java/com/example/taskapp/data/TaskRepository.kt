@@ -8,7 +8,8 @@ class TaskRepository(
     private val financeDao: FinanceDao,
     private val habitDao: HabitDao,
     private val dailyNoteDao: DailyNoteDao,
-    private val savingGoalDao: SavingGoalDao
+    private val savingGoalDao: SavingGoalDao,
+    private val gymExerciseDao: GymExerciseDao
 ) {
     val allTasks: Flow<List<Task>> = taskDao.getAllTasks()
 
@@ -66,4 +67,11 @@ class TaskRepository(
     suspend fun insertSavingGoal(goal: SavingGoal) = savingGoalDao.insertGoal(goal)
     suspend fun updateSavingGoal(goal: SavingGoal) = savingGoalDao.updateGoal(goal)
     suspend fun deleteSavingGoal(goal: SavingGoal) = savingGoalDao.deleteGoal(goal)
+
+    // Gym Exercise operations
+    val allGymExercises: Flow<List<GymExercise>> = gymExerciseDao.getAllExercises()
+    fun getExercisesForDay(dayOfWeek: Int): Flow<List<GymExercise>> = gymExerciseDao.getExercisesForDay(dayOfWeek)
+    suspend fun insertGymExercise(exercise: GymExercise) = gymExerciseDao.insertExercise(exercise)
+    suspend fun updateGymExercise(exercise: GymExercise) = gymExerciseDao.updateExercise(exercise)
+    suspend fun deleteGymExercise(exercise: GymExercise) = gymExerciseDao.deleteExercise(exercise)
 }

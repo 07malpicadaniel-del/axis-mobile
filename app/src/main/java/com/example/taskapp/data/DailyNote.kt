@@ -7,6 +7,6 @@ import androidx.room.PrimaryKey
 data class DailyNote(
     @PrimaryKey
     val dateMillis: Long, // Start of day timestamp
-    val moodEmoji: String = "Excelente", // e.g., "Excelente", "Bueno", "Normal", "Cansado"
+    val moodEmoji: String = "Great", // e.g., "Great", "Good", "Okay", "Tired"
     val noteText: String = ""
 )

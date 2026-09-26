@@ -4,17 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Mood
 import androidx.compose.material.icons.filled.Today
@@ -41,207 +38,154 @@ fun CalendarScreen(viewModel: TaskViewModel) {
     val tasksGroupedByDate by viewModel.tasksGroupedByDate.collectAsState()
     val currentDailyNote by viewModel.currentDailyNote.collectAsState()
 
-    var showDialog by remember { mutableStateOf(false) }
     var showNoteDialog by remember { mutableStateOf(false) }
-    var taskToEdit by remember { mutableStateOf<Task?>(null) }
 
-    // Calendar navigation state (current displayed month)
     var currentMonthCalendar by remember {
         mutableStateOf(Calendar.getInstance().apply { timeInMillis = selectedDateMillis })
     }
 
     val selectedDateHeaderFormat = remember {
-        SimpleDateFormat("EEEE, d 'de' MMMM 'de' yyyy", Locale.getDefault())
+        SimpleDateFormat("EEEE, MMMM d, yyyy", Locale.US)
     }
 
     val pendingCount = tasksForDate.count { !it.isCompleted }
     val completedCount = tasksForDate.count { it.isCompleted }
 
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    taskToEdit = null
-                    showDialog = true
-                }
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar Tarea para la fecha seleccionada")
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(8.dp)
+    ) {
+        // Interactive Month Calendar Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(8.dp)) {
+                MonthHeader(
+                    currentMonth = currentMonthCalendar,
+                    onPreviousMonth = {
+                        currentMonthCalendar = (currentMonthCalendar.clone() as Calendar).apply {
+                            add(Calendar.MONTH, -1)
+                        }
+                    },
+                    onNextMonth = {
+                        currentMonthCalendar = (currentMonthCalendar.clone() as Calendar).apply {
+                            add(Calendar.MONTH, 1)
+                        }
+                    },
+                    onTodayClick = {
+                        val todayMillis = System.currentTimeMillis()
+                        currentMonthCalendar = Calendar.getInstance().apply { timeInMillis = todayMillis }
+                        viewModel.selectDate(todayMillis)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                WeekdayHeader()
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                MonthDaysGrid(
+                    displayedMonth = currentMonthCalendar,
+                    selectedDateMillis = selectedDateMillis,
+                    tasksGroupedByDate = tasksGroupedByDate,
+                    onDateSelected = { dateMillis ->
+                        viewModel.selectDate(dateMillis)
+                    }
+                )
             }
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Selected Date Summary Bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+            shape = RoundedCornerShape(8.dp)
         ) {
-            // Interactive Custom Month Calendar Card
-            Card(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(8.dp)) {
-                    // Month Navigation Header
-                    MonthHeader(
-                        currentMonth = currentMonthCalendar,
-                        onPreviousMonth = {
-                            currentMonthCalendar = (currentMonthCalendar.clone() as Calendar).apply {
-                                add(Calendar.MONTH, -1)
-                            }
-                        },
-                        onNextMonth = {
-                            currentMonthCalendar = (currentMonthCalendar.clone() as Calendar).apply {
-                                add(Calendar.MONTH, 1)
-                            }
-                        },
-                        onTodayClick = {
-                            val todayMillis = System.currentTimeMillis()
-                            currentMonthCalendar = Calendar.getInstance().apply { timeInMillis = todayMillis }
-                            viewModel.selectDate(todayMillis)
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Weekday Titles
-                    WeekdayHeader()
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Month Days Grid with Tasks Inside
-                    MonthDaysGrid(
-                        displayedMonth = currentMonthCalendar,
-                        selectedDateMillis = selectedDateMillis,
-                        tasksGroupedByDate = tasksGroupedByDate,
-                        onDateSelected = { dateMillis ->
-                            viewModel.selectDate(dateMillis)
-                        }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Daily Mood & Journal Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Mood, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "Diario del Día",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = currentDailyNote?.moodEmoji ?: "Excelente",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (!currentDailyNote?.noteText.isNull_or_blank()) currentDailyNote!!.noteText else "Sin nota para este día. Presiona editar para escribir.",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
-                    }
-
-                    IconButton(onClick = { showNoteDialog = true }) {
-                        Icon(Icons.Default.Edit, contentDescription = "Editar Nota y Estado de Ánimo")
-                    }
-                }
-            }
-
-            // Summary Header for Selected Date
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = selectedDateHeaderFormat.format(Date(selectedDateMillis))
-                                .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "$pendingCount pendientes • $completedCount completadas",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Tasks List for Selected Date
-            if (tasksForDate.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
+                Column {
                     Text(
-                        text = "No hay tareas programadas para esta fecha.",
+                        text = selectedDateHeaderFormat.format(Date(selectedDateMillis)),
                         fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "$pendingCount pending • $completedCount completed",
+                        fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(tasksForDate, key = { it.id }) { task ->
-                        TaskItemCard(
-                            task = task,
-                            onToggleComplete = { viewModel.toggleTaskCompleted(task) },
-                            onEdit = {
-                                taskToEdit = task
-                                showDialog = true
-                            },
-                            onDelete = { viewModel.deleteTask(task) }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Daily Mood & Journal Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Default.Mood, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "Daily Mood:",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text(
+                                    text = currentDailyNote?.moodEmoji ?: "Great",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (!currentDailyNote?.noteText.isNullOrEmpty()) currentDailyNote!!.noteText else "Tap edit to write a daily reflection.",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2
                         )
                     }
+                }
+
+                IconButton(onClick = { showNoteDialog = true }) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Note")
                 }
             }
         }
@@ -249,7 +193,7 @@ fun CalendarScreen(viewModel: TaskViewModel) {
 
     if (showNoteDialog) {
         DailyNoteDialog(
-            initialMood = currentDailyNote?.moodEmoji ?: "Excelente",
+            initialMood = currentDailyNote?.moodEmoji ?: "Great",
             initialText = currentDailyNote?.noteText ?: "",
             onDismiss = { showNoteDialog = false },
             onConfirm = { mood, text ->
@@ -258,34 +202,6 @@ fun CalendarScreen(viewModel: TaskViewModel) {
             }
         )
     }
-
-    if (showDialog) {
-        TaskDialog(
-            task = taskToEdit,
-            defaultDateMillis = selectedDateMillis,
-            onDismiss = { showDialog = false },
-            onConfirm = { title, description, dateMillis, priority, category ->
-                if (taskToEdit == null) {
-                    viewModel.addTask(title, description, dateMillis, priority, category)
-                } else {
-                    viewModel.updateTask(
-                        taskToEdit!!.copy(
-                            title = title,
-                            description = description,
-                            dateMillis = dateMillis,
-                            priority = priority,
-                            category = category
-                        )
-                    )
-                }
-                showDialog = false
-            }
-        )
-    }
-}
-
-private fun String?.isNull_or_blank(): Boolean {
-    return this == null || this.isBlank()
 }
 
 @Composable
@@ -298,20 +214,22 @@ fun DailyNoteDialog(
     var selectedMood by remember { mutableStateOf(initialMood) }
     var noteText by remember { mutableStateOf(initialText) }
 
-    val moodOptions = listOf("Excelente", "Bueno", "Normal", "Cansado")
+    val moodOptions = listOf("Great", "Good", "Okay", "Tired")
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Diario de Ánimo y Reflexión") },
+        title = { Text("Daily Reflection & Mood") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Text("¿Cómo estuvo tu día?", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Row(
+                Text("How was your day?", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     moodOptions.forEach { mood ->
                         FilterChip(
@@ -325,7 +243,7 @@ fun DailyNoteDialog(
                 OutlinedTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
-                    label = { Text("Nota o Reflexión del día") },
+                    label = { Text("Daily Note") },
                     maxLines = 4,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -333,12 +251,12 @@ fun DailyNoteDialog(
         },
         confirmButton = {
             Button(onClick = { onConfirm(selectedMood, noteText) }) {
-                Text("Guardar")
+                Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )
@@ -351,9 +269,8 @@ fun MonthHeader(
     onNextMonth: () -> Unit,
     onTodayClick: () -> Unit
 ) {
-    val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.getDefault()) }
+    val monthYearFormat = remember { SimpleDateFormat("MMMM yyyy", Locale.US) }
     val title = monthYearFormat.format(currentMonth.time)
-        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -369,13 +286,13 @@ fun MonthHeader(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onTodayClick) {
-                Icon(Icons.Default.Today, contentDescription = "Hoy")
+                Icon(Icons.Default.Today, contentDescription = "Today")
             }
             IconButton(onClick = onPreviousMonth) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Mes Anterior")
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous Month")
             }
             IconButton(onClick = onNextMonth) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Mes Siguiente")
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next Month")
             }
         }
     }
@@ -383,7 +300,7 @@ fun MonthHeader(
 
 @Composable
 fun WeekdayHeader() {
-    val days = listOf("Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb")
+    val days = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
     Row(modifier = Modifier.fillMaxWidth()) {
         days.forEach { day ->
             Text(
@@ -408,12 +325,12 @@ fun MonthDaysGrid(
     val daysInMonth = remember(displayedMonth) {
         val cal = displayedMonth.clone() as Calendar
         cal.set(Calendar.DAY_OF_MONTH, 1)
-        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0 for Sunday
+        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1
         val maxDays = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
         val list = mutableListOf<CalendarDay?>()
         for (i in 0 until firstDayOfWeek) {
-            list.add(null) // blank spaces before 1st day of month
+            list.add(null)
         }
 
         for (day in 1..maxDays) {
@@ -504,31 +421,19 @@ fun DayCell(
             color = textColor
         )
 
-        // Indicator dots for tasks inside the calendar day
         if (hasTasks) {
             Spacer(modifier = Modifier.height(2.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (pendingTasks.isNotEmpty()) {
-                    val dotColor = if (hasHighPriorityPending) Color(0xFFE53935) else if (isSelected) Color.White else MaterialTheme.colorScheme.primary
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(dotColor)
-                    )
-                } else {
-                    // All completed
-                    val dotColor = if (isSelected) Color.White else Color(0xFF4CAF50)
-                    Box(
-                        modifier = Modifier
-                            .size(5.dp)
-                            .clip(CircleShape)
-                            .background(dotColor)
-                    )
-                }
+                val dotColor = if (hasHighPriorityPending) MaterialTheme.colorScheme.error else if (isSelected) Color.White else MaterialTheme.colorScheme.primary
+                Box(
+                    modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(dotColor)
+                )
             }
         }
     }

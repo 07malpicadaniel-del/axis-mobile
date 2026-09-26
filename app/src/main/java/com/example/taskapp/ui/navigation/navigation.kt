@@ -33,13 +33,13 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
 
     val topBarTitle = when (currentRoute) {
-        "tasks" -> "Agenda - Mis Tareas"
-        "calendar" -> "Agenda - Calendario"
-        "schedule" -> "Agenda - Horario Personal"
-        "finances" -> "Agenda - Control de Finanzas"
-        "stats" -> "Agenda - Estadísticas y Gráficas"
-        "settings" -> "Agenda - Ajustes y Temas"
-        else -> "Agenda"
+        "tasks" -> "Tasks"
+        "calendar" -> "Calendar"
+        "schedule" -> "Schedule & Routines"
+        "finances" -> "Finances"
+        "stats" -> "Analytics"
+        "settings" -> "Settings"
+        else -> "TaskApp"
     }
 
     Scaffold(
@@ -51,7 +51,7 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Volver"
+                                contentDescription = "Back"
                             )
                         }
                     }
@@ -60,7 +60,7 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                     IconButton(onClick = { viewModel.toggleTheme() }) {
                         Icon(
                             imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = "Cambiar modo Claro/Oscuro"
+                            contentDescription = "Toggle Dark/Light Mode"
                         )
                     }
 
@@ -73,7 +73,7 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                             }
                         }
                     ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Ajustes")
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -85,8 +85,8 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Tareas") },
-                    label = { Text("Tareas") },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Tasks") },
+                    label = { Text("Tasks") },
                     selected = currentRoute == "tasks",
                     onClick = {
                         navController.navigate("tasks") {
@@ -97,8 +97,8 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Calendario") },
-                    label = { Text("Calendario") },
+                    icon = { Icon(Icons.Default.DateRange, contentDescription = "Calendar") },
+                    label = { Text("Calendar") },
                     selected = currentRoute == "calendar",
                     onClick = {
                         navController.navigate("calendar") {
@@ -109,8 +109,8 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Schedule, contentDescription = "Horario") },
-                    label = { Text("Horario") },
+                    icon = { Icon(Icons.Default.Schedule, contentDescription = "Schedule") },
+                    label = { Text("Schedule") },
                     selected = currentRoute == "schedule",
                     onClick = {
                         navController.navigate("schedule") {
@@ -121,8 +121,8 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.MonetizationOn, contentDescription = "Finanzas") },
-                    label = { Text("Finanzas") },
+                    icon = { Icon(Icons.Default.MonetizationOn, contentDescription = "Finances") },
+                    label = { Text("Finances") },
                     selected = currentRoute == "finances",
                     onClick = {
                         navController.navigate("finances") {
@@ -133,8 +133,8 @@ fun MainAppNavigation(viewModel: TaskViewModel) {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.BarChart, contentDescription = "Gráficas") },
-                    label = { Text("Gráficas") },
+                    icon = { Icon(Icons.Default.BarChart, contentDescription = "Analytics") },
+                    label = { Text("Analytics") },
                     selected = currentRoute == "stats",
                     onClick = {
                         navController.navigate("stats") {

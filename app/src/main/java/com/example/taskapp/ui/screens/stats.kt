@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
@@ -28,9 +27,10 @@ fun StatsScreen(viewModel: TaskViewModel) {
     val allFinanceEntries by viewModel.allFinanceEntries.collectAsState()
     val monthlyBudget by viewModel.monthlyBudget.collectAsState()
     val allScheduleSlots by viewModel.allScheduleSlots.collectAsState()
+    val historicalPerformance by viewModel.historicalPerformance.collectAsState()
 
     var selectedSectionIndex by remember { mutableIntStateOf(0) }
-    val sectionTabs = listOf("Visión General", "Tareas", "Finanzas", "Rutinas / Horario")
+    val sectionTabs = listOf("Overview", "Tasks", "Finances", "Schedule", "History")
 
     // Task Stats
     val totalTasks = allTasks.size
@@ -45,7 +45,7 @@ fun StatsScreen(viewModel: TaskViewModel) {
     val remainingBalance = totalBudgetAvailable - totalExpenses
     val spentPercentage = if (totalBudgetAvailable > 0) ((totalExpenses / totalBudgetAvailable) * 100).coerceAtMost(100.0) else 0.0
 
-    val financeCategories = listOf("Renta", "Despensa", "Servicios", "Transporte", "Ocio", "Ahorro", "Otros")
+    val financeCategories = listOf("Rent", "Groceries", "Utilities", "Transport", "Leisure", "Savings", "Other")
     val expensesByCategory = financeCategories.associateWith { cat ->
         allFinanceEntries.filter { it.type == TransactionType.EXPENSE && it.category.equals(cat, ignoreCase = true) }.sumOf { it.amount }
     }
@@ -55,7 +55,7 @@ fun StatsScreen(viewModel: TaskViewModel) {
     val completedScheduleSlots = allScheduleSlots.count { it.isCompleted }
     val scheduleCompliancePercentage = if (totalScheduleSlots > 0) (completedScheduleSlots.toFloat() / totalScheduleSlots) * 100f else 0f
 
-    val scheduleCategories = listOf("Trabajo", "Estudios", "Ejercicio", "Almuerzo", "Descanso", "General")
+    val scheduleCategories = listOf("Work", "Study", "Fitness", "Personal")
     val slotsByCategory = scheduleCategories.associateWith { cat ->
         allScheduleSlots.count { it.category.equals(cat, ignoreCase = true) }
     }
@@ -77,7 +77,7 @@ fun StatsScreen(viewModel: TaskViewModel) {
                 Tab(
                     selected = selectedSectionIndex == index,
                     onClick = { selectedSectionIndex = index },
-                    text = { Text(title, fontSize = 12.sp, fontWeight = if (selectedSectionIndex == index) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text(title, fontSize = 11.sp, fontWeight = if (selectedSectionIndex == index) FontWeight.Bold else FontWeight.Normal) }
                 )
             }
         }
@@ -92,40 +92,39 @@ fun StatsScreen(viewModel: TaskViewModel) {
             when (selectedSectionIndex) {
                 0 -> {
                     // Visión General Dashboard
-                    Text("Panel Unificado de Control", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                    Text("Control Dashboard", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MetricCard(title = "Productividad Tareas", value = "${taskCompletionPercentage.toInt()}%", subtitle = "$completedTasks de $totalTasks tareas", modifier = Modifier.weight(1f))
-                        MetricCard(title = "Cumplimiento Horario", value = "${scheduleCompliancePercentage.toInt()}%", subtitle = "$completedScheduleSlots de $totalScheduleSlots actividades", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Task Completion", value = "${taskCompletionPercentage.toInt()}%", subtitle = "$completedTasks of $totalTasks tasks", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Schedule Adherence", value = "${scheduleCompliancePercentage.toInt()}%", subtitle = "$completedScheduleSlots of $totalScheduleSlots done", modifier = Modifier.weight(1f))
                     }
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MetricCard(title = "Presupuesto Restante", value = "$${String.format(Locale.US, "%.0f", remainingBalance)}", subtitle = "${spentPercentage.toInt()}% consumido", modifier = Modifier.weight(1f))
-                        MetricCard(title = "Tareas Críticas", value = "$highPriorityPending", subtitle = "Alta prioridad pendientes", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Remaining Budget", value = "$${String.format(Locale.US, "%.0f", remainingBalance)}", subtitle = "${spentPercentage.toInt()}% used", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Critical Tasks", value = "$highPriorityPending", subtitle = "High priority pending", modifier = Modifier.weight(1f))
                     }
 
-                    // Combined Quick Progress Rings
-                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Balance General de Organización", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Overall Balance", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            PriorityProgressRow(title = "Avance en Tareas", count = completedTasks, total = totalTasks, color = primaryColor)
+                            PriorityProgressRow(title = "Tasks Completion", count = completedTasks, total = totalTasks)
                             Spacer(modifier = Modifier.height(8.dp))
-                            PriorityProgressRow(title = "Cumplimiento de Rutinas / Horario", count = completedScheduleSlots, total = totalScheduleSlots, color = Color(0xFF4CAF50))
+                            PriorityProgressRow(title = "Schedule Adherence", count = completedScheduleSlots, total = totalScheduleSlots)
                             Spacer(modifier = Modifier.height(8.dp))
-                            PriorityProgressRow(title = "Presupuesto Utilizado", count = totalExpenses.toInt(), total = totalBudgetAvailable.toInt(), color = Color(0xFFFB8C00))
+                            PriorityProgressRow(title = "Budget Spent", count = totalExpenses.toInt(), total = totalBudgetAvailable.toInt())
                         }
                     }
                 }
 
                 1 -> {
                     // Tareas
-                    Text("Estadísticas de Tareas", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                    Text("Tasks Analytics", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
 
-                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Progreso Global de Cumplimiento", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                            Text("Overall Task Progress", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
                             Spacer(modifier = Modifier.height(16.dp))
 
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
@@ -141,42 +140,40 @@ fun StatsScreen(viewModel: TaskViewModel) {
 
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text("${taskCompletionPercentage.toInt()}%", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = primaryColor)
-                                    Text("$completedTasks de $totalTasks completadas", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("$completedTasks of $totalTasks completed", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
 
-                    // Priority Breakdown Card
-                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                            Text("Desglose por Niveles de Prioridad", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Priority Breakdown", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(12.dp))
 
                             val highCount = allTasks.count { it.priority == Priority.HIGH }
                             val mediumCount = allTasks.count { it.priority == Priority.MEDIUM }
                             val lowCount = allTasks.count { it.priority == Priority.LOW }
 
-                            PriorityProgressRow(title = "Alta Prioridad", count = highCount, total = totalTasks, color = Color(0xFFE53935))
-                            PriorityProgressRow(title = "Prioridad Media", count = mediumCount, total = totalTasks, color = Color(0xFFFB8C00))
-                            PriorityProgressRow(title = "Baja Prioridad", count = lowCount, total = totalTasks, color = Color(0xFF4CAF50))
+                            PriorityProgressRow(title = "High Priority", count = highCount, total = totalTasks)
+                            PriorityProgressRow(title = "Medium Priority", count = mediumCount, total = totalTasks)
+                            PriorityProgressRow(title = "Low Priority", count = lowCount, total = totalTasks)
                         }
                     }
                 }
 
                 2 -> {
                     // Finanzas
-                    Text("Análisis Financiero y Presupuesto", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                    Text("Financial Analytics", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MetricCard(title = "Ingresos / Presupuesto", value = "$${String.format(Locale.US, "%.0f", totalBudgetAvailable)}", subtitle = "Monto mensual total", modifier = Modifier.weight(1f))
-                        MetricCard(title = "Gastos Totales", value = "-$${String.format(Locale.US, "%.0f", totalExpenses)}", subtitle = "${spentPercentage.toInt()}% ejecutado", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Budget / Income", value = "$${String.format(Locale.US, "%.0f", totalBudgetAvailable)}", subtitle = "Monthly total", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Total Expenses", value = "-$${String.format(Locale.US, "%.0f", totalExpenses)}", subtitle = "${spentPercentage.toInt()}% spent", modifier = Modifier.weight(1f))
                     }
 
-                    // Expenses Bar Breakdown Chart
-                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
+                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
                         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                            Text("Desglose de Gastos por Categoría", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text("Expenses Breakdown by Category", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(16.dp))
 
                             val maxExpense = expensesByCategory.values.maxOrNull()?.coerceAtLeast(1.0) ?: 1.0
@@ -187,71 +184,7 @@ fun StatsScreen(viewModel: TaskViewModel) {
                                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                         Text(cat, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        Text("$${String.format(Locale.US, "%.2f", amount)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Canvas(modifier = Modifier.fillMaxWidth().height(10.dp)) {
-                                        drawRoundRect(color = trackColor, size = Size(size.width, size.height), cornerRadius = CornerRadius(5.dp.toPx()))
-                                        if (fraction > 0f) {
-                                            drawRoundRect(color = Color(0xFFE53935), size = Size(size.width * fraction, size.height), cornerRadius = CornerRadius(5.dp.toPx()))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                3 -> {
-                    // Rutinas & Horario
-                    Text("Análisis de Rutinas y Cumplimiento de Horario", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        MetricCard(title = "Actividades Totales", value = "$totalScheduleSlots", subtitle = "Programadas en el horario", modifier = Modifier.weight(1f))
-                        MetricCard(title = "Cumplimiento", value = "${scheduleCompliancePercentage.toInt()}%", subtitle = "$completedScheduleSlots completadas", modifier = Modifier.weight(1f))
-                    }
-
-                    // Schedule Ring Chart Card
-                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
-                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Tasa de Cumplimiento de Rutina", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val strokeWidth = 18.dp.toPx()
-                                    val diameter = size.minDimension - strokeWidth
-                                    val topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
-
-                                    drawArc(color = trackColor, startAngle = 0f, sweepAngle = 360f, useCenter = false, topLeft = topLeft, size = Size(diameter, diameter), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
-                                    val sweepAngle = (scheduleCompliancePercentage / 100f) * 360f
-                                    drawArc(color = Color(0xFF4CAF50), startAngle = -90f, sweepAngle = sweepAngle, useCenter = false, topLeft = topLeft, size = Size(diameter, diameter), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
-                                }
-
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${scheduleCompliancePercentage.toInt()}%", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF4CAF50))
-                                    Text("$completedScheduleSlots de $totalScheduleSlots realizadas", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            }
-                        }
-                    }
-
-                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)) {
-                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                            Text("Distribución de Tiempo por Área", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            val maxSlots = slotsByCategory.values.maxOrNull()?.coerceAtLeast(1) ?: 1
-
-                            slotsByCategory.forEach { (cat, count) ->
-                                val fraction = count.toFloat() / maxSlots
-
-                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(cat, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                        Text("$count bloques", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                                        Text("$${String.format(Locale.US, "%.2f", amount)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                     }
 
                                     Spacer(modifier = Modifier.height(4.dp))
@@ -262,6 +195,114 @@ fun StatsScreen(viewModel: TaskViewModel) {
                                             drawRoundRect(color = primaryColor, size = Size(size.width * fraction, size.height), cornerRadius = CornerRadius(5.dp.toPx()))
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                3 -> {
+                    // Rutinas & Horario
+                    Text("Schedule Analytics", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MetricCard(title = "Total Schedule Blocks", value = "$totalScheduleSlots", subtitle = "Weekly activities", modifier = Modifier.weight(1f))
+                        MetricCard(title = "Schedule Adherence", value = "${scheduleCompliancePercentage.toInt()}%", subtitle = "$completedScheduleSlots done", modifier = Modifier.weight(1f))
+                    }
+
+                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Routine Adherence Rate", fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.size(160.dp)) {
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val strokeWidth = 18.dp.toPx()
+                                    val diameter = size.minDimension - strokeWidth
+                                    val topLeft = Offset(strokeWidth / 2, strokeWidth / 2)
+
+                                    drawArc(color = trackColor, startAngle = 0f, sweepAngle = 360f, useCenter = false, topLeft = topLeft, size = Size(diameter, diameter), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+                                    val sweepAngle = (scheduleCompliancePercentage / 100f) * 360f
+                                    drawArc(color = primaryColor, startAngle = -90f, sweepAngle = sweepAngle, useCenter = false, topLeft = topLeft, size = Size(diameter, diameter), style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+                                }
+
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${scheduleCompliancePercentage.toInt()}%", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = primaryColor)
+                                    Text("$completedScheduleSlots of $totalScheduleSlots done", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+
+                    Card(modifier = Modifier.fillMaxWidth(), elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                            Text("Time Distribution by Category", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            val maxSlots = slotsByCategory.values.maxOrNull()?.coerceAtLeast(1) ?: 1
+
+                            slotsByCategory.forEach { (cat, count) ->
+                                val fraction = count.toFloat() / maxSlots
+
+                                Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(cat, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                        Text("$count blocks", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Canvas(modifier = Modifier.fillMaxWidth().height(10.dp)) {
+                                        drawRoundRect(color = trackColor, size = Size(size.width, size.height), cornerRadius = CornerRadius(5.dp.toPx()))
+                                        if (fraction > 0f) {
+                                            drawRoundRect(color = primaryColor, size = Size(size.width * fraction, size.height), cornerRadius = CornerRadius(5.dp.toPx()))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                4 -> {
+                    // History Log (Past 7 Days)
+                    Text("7-Day Performance History", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+
+                    historicalPerformance.forEach { history ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(history.formattedDate, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.secondaryContainer,
+                                        shape = MaterialTheme.shapes.extraSmall
+                                    ) {
+                                        Text(
+                                            text = "Mood: ${history.mood}",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Tasks: ${history.completedTasks}/${history.totalTasks}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Habits Done: ${history.completedHabits}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("Expenses: $${String.format(Locale.US, "%.2f", history.totalExpenses)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -297,8 +338,7 @@ fun MetricCard(
 fun PriorityProgressRow(
     title: String,
     count: Int,
-    total: Int,
-    color: Color
+    total: Int
 ) {
     val fraction = if (total > 0) (count.toFloat() / total).coerceIn(0f, 1f) else 0f
     val percentage = (fraction * 100).toInt()
@@ -309,7 +349,7 @@ fun PriorityProgressRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(title, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Text("$count ($percentage%)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color)
+            Text("$count ($percentage%)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.height(4.dp))
         LinearProgressIndicator(
@@ -317,7 +357,7 @@ fun PriorityProgressRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(8.dp),
-            color = color,
+            color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.surfaceVariant,
             strokeCap = StrokeCap.Round
         )

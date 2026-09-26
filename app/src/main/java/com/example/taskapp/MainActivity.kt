@@ -37,9 +37,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val isDarkTheme by viewModel.isDarkTheme.collectAsState()
-            val themePreset by viewModel.themePreset.collectAsState()
 
-            TaskAppTheme(darkTheme = isDarkTheme, themePreset = themePreset) {
+            TaskAppTheme(darkTheme = isDarkTheme) {
                 MainAppNavigation(viewModel = viewModel)
             }
         }

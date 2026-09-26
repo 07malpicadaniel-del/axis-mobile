@@ -15,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,7 +31,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
     val allFinanceEntries by viewModel.allFinanceEntries.collectAsState()
     val allSavingGoals by viewModel.allSavingGoals.collectAsState()
 
-    var selectedCategoryFilter by remember { mutableStateOf("Todas") }
+    var selectedCategoryFilter by remember { mutableStateOf("All") }
     var showEntryDialog by remember { mutableStateOf(false) }
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showGoalDialog by remember { mutableStateOf(false) }
@@ -52,7 +51,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
     val spentPercentage = if (totalBudgetAvailable > 0) ((totalExpenses / totalBudgetAvailable) * 100).coerceAtMost(100.0) else 0.0
 
     val filteredEntries = remember(allFinanceEntries, selectedCategoryFilter) {
-        if (selectedCategoryFilter == "Todas") {
+        if (selectedCategoryFilter == "All") {
             allFinanceEntries
         } else {
             allFinanceEntries.filter { it.category.equals(selectedCategoryFilter, ignoreCase = true) }
@@ -67,7 +66,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                     showEntryDialog = true
                 }
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar Transacción")
+                Icon(Icons.Default.Add, contentDescription = "Add Transaction")
             }
         }
     ) { innerPadding ->
@@ -76,12 +75,12 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Budget & Balance Summary Cards
+            // Budget Summary Card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -90,7 +89,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text("Presupuesto Mensual Base", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Monthly Budget", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 text = "$${String.format(Locale.US, "%.2f", totalBudgetAvailable)}",
                                 fontSize = 22.sp,
@@ -100,7 +99,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                         }
 
                         IconButton(onClick = { showBudgetDialog = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar Presupuesto")
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Budget")
                         }
                     }
 
@@ -111,7 +110,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column {
-                            Text("Total Gastado", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Spent", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 text = "-$${String.format(Locale.US, "%.2f", totalExpenses)}",
                                 fontSize = 16.sp,
@@ -121,19 +120,18 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                         }
 
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("Disponible", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Remaining", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(
                                 text = "$${String.format(Locale.US, "%.2f", remainingBalance)}",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (remainingBalance >= 0) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
+                                color = if (remainingBalance >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Progress bar for spent budget
                     LinearProgressIndicator(
                         progress = { (spentPercentage / 100.0).toFloat() },
                         modifier = Modifier
@@ -146,7 +144,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Gastado: ${spentPercentage.toInt()}% del presupuesto",
+                        text = "${spentPercentage.toInt()}% spent",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.align(Alignment.End)
@@ -163,13 +161,13 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Savings, contentDescription = null, tint = Color(0xFF2E7D32))
+                    Icon(Icons.Default.Savings, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Metas de Ahorro", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("Savings Goals", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
                 IconButton(onClick = { showGoalDialog = true }) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar Meta de Ahorro")
+                    Icon(Icons.Default.Add, contentDescription = "Add Goal")
                 }
             }
 
@@ -184,15 +182,14 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                     items(allSavingGoals, key = { it.id }) { goal ->
                         val progress = if (goal.targetAmount > 0) (goal.currentAmount / goal.targetAmount).coerceAtMost(1.0) else 0.0
                         Card(
-                            modifier = Modifier
-                                .width(220.dp),
+                            modifier = Modifier.width(220.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                     Text(goal.title, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f))
                                     IconButton(onClick = { viewModel.deleteSavingGoal(goal) }, modifier = Modifier.size(20.dp)) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Eliminar Meta", tint = MaterialTheme.colorScheme.error)
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete Goal", tint = MaterialTheme.colorScheme.error)
                                     }
                                 }
 
@@ -202,7 +199,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                                     text = "$${String.format(Locale.US, "%.0f", goal.currentAmount)} / $${String.format(Locale.US, "%.0f", goal.targetAmount)}",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF2E7D32)
+                                    color = MaterialTheme.colorScheme.primary
                                 )
 
                                 Spacer(modifier = Modifier.height(6.dp))
@@ -212,7 +209,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(6.dp),
-                                    color = Color(0xFF2E7D32),
+                                    color = MaterialTheme.colorScheme.primary,
                                     trackColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
 
@@ -223,7 +220,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                                     modifier = Modifier.fillMaxWidth(),
                                     contentPadding = PaddingValues(vertical = 2.dp)
                                 ) {
-                                    Text("+ Abonar Ahorro", fontSize = 11.sp)
+                                    Text("+ Deposit", fontSize = 11.sp)
                                 }
                             }
                         }
@@ -233,7 +230,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
             }
 
             // Category Filter Row
-            val categories = listOf("Todas", "Renta", "Despensa", "Servicios", "Transporte", "Ocio", "Ahorro", "Otros")
+            val categories = listOf("All", "Rent", "Groceries", "Utilities", "Transport", "Leisure", "Savings", "Other")
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -267,7 +264,7 @@ fun FinancesScreen(viewModel: TaskViewModel) {
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Sin movimientos registrados.\nPresiona + para agregar un gasto o ingreso.",
+                                text = "No transactions recorded.\nTap + to add income or expense.",
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -361,13 +358,13 @@ fun AddSavingGoalDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Nueva Meta de Ahorro") },
+        title = { Text("New Savings Goal") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Nombre de la Meta (ej. Laptop, Viaje, Fondo)") },
+                    label = { Text("Goal Title (e.g. Laptop, Trip)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -375,7 +372,7 @@ fun AddSavingGoalDialog(
                 OutlinedTextField(
                     value = targetText,
                     onValueChange = { targetText = it },
-                    label = { Text("Monto Objetivo ($)") },
+                    label = { Text("Target Amount ($)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -391,12 +388,12 @@ fun AddSavingGoalDialog(
                 },
                 enabled = title.isNotBlank() && targetText.toDoubleOrNull() != null
             ) {
-                Text("Guardar")
+                Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )
@@ -412,12 +409,12 @@ fun DepositGoalDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Abonar a Ahorro: ${goal.title}") },
+        title = { Text("Deposit to: ${goal.title}") },
         text = {
             OutlinedTextField(
                 value = depositText,
                 onValueChange = { depositText = it },
-                label = { Text("Monto a Abonar ($)") },
+                label = { Text("Deposit Amount ($)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -432,12 +429,12 @@ fun DepositGoalDialog(
                 },
                 enabled = depositText.toDoubleOrNull() != null
             ) {
-                Text("Abonar")
+                Text("Deposit")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )
@@ -449,16 +446,16 @@ fun FinanceEntryCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMM d, yyyy", Locale.US) }
     val formattedDate = dateFormat.format(Date(entry.dateMillis))
 
     val isExpense = entry.type == TransactionType.EXPENSE
-    val amountColor = if (isExpense) MaterialTheme.colorScheme.error else Color(0xFF2E7D32)
+    val amountColor = if (isExpense) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
     val amountPrefix = if (isExpense) "-" else "+"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -508,12 +505,12 @@ fun FinanceEntryCard(
             )
 
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Editar Transacción")
+                Icon(Icons.Default.Edit, contentDescription = "Edit Transaction")
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Default.Delete,
-                    contentDescription = "Eliminar Transacción",
+                    contentDescription = "Delete Transaction",
                     tint = MaterialTheme.colorScheme.error
                 )
             }
@@ -531,12 +528,12 @@ fun BudgetDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Configurar Presupuesto Mensual") },
+        title = { Text("Set Monthly Budget") },
         text = {
             OutlinedTextField(
                 value = budgetText,
                 onValueChange = { budgetText = it },
-                label = { Text("Monto ($)") },
+                label = { Text("Amount ($)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -550,12 +547,12 @@ fun BudgetDialog(
                     }
                 }
             ) {
-                Text("Guardar")
+                Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )
@@ -571,13 +568,13 @@ fun FinanceEntryDialog(
     var title by remember { mutableStateOf(entry?.title ?: "") }
     var amountText by remember { mutableStateOf(entry?.amount?.toString() ?: "") }
     var selectedType by remember { mutableStateOf(entry?.type ?: TransactionType.EXPENSE) }
-    var selectedCategory by remember { mutableStateOf(entry?.category ?: "Renta") }
+    var selectedCategory by remember { mutableStateOf(entry?.category ?: "Rent") }
 
-    val categories = listOf("Renta", "Despensa", "Servicios", "Transporte", "Ocio", "Ahorro", "Otros")
+    val categories = listOf("Rent", "Groceries", "Utilities", "Transport", "Leisure", "Savings", "Other")
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (entry == null) "Nuevo Movimiento" else "Editar Movimiento") },
+        title = { Text(if (entry == null) "New Transaction" else "Edit Transaction") },
         text = {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -586,7 +583,7 @@ fun FinanceEntryDialog(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("Descripción (ej. Renta, Despensa)") },
+                    label = { Text("Title (e.g. Rent, Groceries)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -594,12 +591,12 @@ fun FinanceEntryDialog(
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text("Monto ($)") },
+                    label = { Text("Amount ($)") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Text("Tipo de Movimiento:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Type:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -613,7 +610,7 @@ fun FinanceEntryDialog(
                     }
                 }
 
-                Text("Categoría:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Text("Category:", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -638,12 +635,12 @@ fun FinanceEntryDialog(
                 },
                 enabled = title.isNotBlank() && amountText.toDoubleOrNull() != null
             ) {
-                Text("Guardar")
+                Text("Save")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancelar")
+                Text("Cancel")
             }
         }
     )

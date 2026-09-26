@@ -6,31 +6,40 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.taskapp.data.*
-import com.example.taskapp.ui.theme.ThemePreset
 import com.example.taskapp.util.NotificationHelper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.util.*
 
 enum class FilterStatus(val label: String) {
-    ALL("Todas"),
-    PENDING("Pendientes"),
-    COMPLETED("Completadas")
+    ALL("All"),
+    PENDING("Pending"),
+    COMPLETED("Completed")
 }
 
 enum class RoutineType(val title: String, val description: String) {
-    OFICINA("Rutina de Oficina / Trabajo", "Enfocada en trabajo productivo, pausas para comer y ejercicio."),
-    ESTUDIANTE("Rutina de Estudiante", "Bloques de clases, estudio en profundidad y tiempo libre."),
-    FIN_DE_SEMANA("Rutina de Fin de Semana", "Tiempo para hobbies, familia, deporte y descanso.")
+    OFICINA("Office & Work Routine", "Structured around focused work, meal breaks, and exercise."),
+    ESTUDIANTE("Student Routine", "Classes, deep study blocks, sports, and rest."),
+    FIN_DE_SEMANA("Weekend Routine", "Hobbies, family time, outdoor activities, and leisure.")
 }
+
+data class DailyPerformanceHistory(
+    val dateMillis: Long,
+    val formattedDate: String,
+    val completedTasks: Int,
+    val totalTasks: Int,
+    val completedHabits: Int,
+    val totalExpenses: Double,
+    val mood: String
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: TaskRepository
     val isDarkTheme = MutableStateFlow(false)
-    val themePreset = MutableStateFlow(ThemePreset.MONOCHROME)
 
     val selectedDateMillis = MutableStateFlow(getStartOfDay(System.currentTimeMillis()))
 
@@ -38,7 +47,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     // Filtering states
     val searchQuery = MutableStateFlow("")
-    val selectedCategory = MutableStateFlow("Todas")
+    val selectedCategory = MutableStateFlow("All")
     val selectedFilterStatus = MutableStateFlow(FilterStatus.ALL)
 
     // Flow of tasks filtered by search, category, and completion status
@@ -50,9 +59,13 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     val tasksForSelectedDate: StateFlow<List<Task>>
 
     // Schedule / Horario Personal States
-    val selectedScheduleDay = MutableStateFlow(1) // 1 = Lunes, ..., 7 = Domingo
+    val selectedScheduleDay = MutableStateFlow(1) // 1 = Mon, ..., 7 = Sun
     val scheduleSlotsForSelectedDay: StateFlow<List<ScheduleSlot>>
     val allScheduleSlots: StateFlow<List<ScheduleSlot>>
+
+    // Gym / Workout Routine States
+    val allGymExercises: StateFlow<List<GymExercise>>
+    val exercisesForSelectedDay: StateFlow<List<GymExercise>>
 
     // Finance States
     val monthlyBudget = MutableStateFlow(1000.0) // Monthly income/budget limit (e.g. $1000)
@@ -66,6 +79,12 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     // Daily Note State
     val currentDailyNote: StateFlow<DailyNote?>
 
+    // Historical Performance Log Flow (Past 7 Days)
+    val historicalPerformance: StateFlow<List<DailyPerformanceHistory>>
+
+    // Overall Active Daily Streak
+    val overallDailyStreak: StateFlow<Int>
+
     init {
         val database = TaskDatabase.getDatabase(application)
         repository = TaskRepository(
@@ -74,7 +93,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             database.financeDao(),
             database.habitDao(),
             database.dailyNoteDao(),
-            database.savingGoalDao()
+            database.savingGoalDao(),
+            database.gymExerciseDao()
         )
 
         allTasks = repository.allTasks.stateIn(
@@ -94,7 +114,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                         task.title.contains(query, ignoreCase = true) ||
                         task.description.contains(query, ignoreCase = true)
 
-                val matchesCategory = (category == "Todas" || task.category.equals(category, ignoreCase = true))
+                val matchesCategory = (category == "All" || task.category.equals(category, ignoreCase = true))
 
                 val matchesStatus = when (status) {
                     FilterStatus.ALL -> true
@@ -142,6 +162,20 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
+        allGymExercises = repository.allGymExercises.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+        exercisesForSelectedDay = selectedScheduleDay.flatMapLatest { dayOfWeek ->
+            repository.getExercisesForDay(dayOfWeek)
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
         allFinanceEntries = repository.allFinanceEntries.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -173,14 +207,108 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = null
         )
+
+        // Calculate 7-day Historical Performance
+        historicalPerformance = combine(
+            allTasks,
+            allHabitLogs,
+            allFinanceEntries,
+            repository.allDailyNotes
+        ) { tasks, habitLogs, finances, notes ->
+            val historyList = mutableListOf<DailyPerformanceHistory>()
+            val cal = Calendar.getInstance().apply { timeInMillis = getStartOfDay(System.currentTimeMillis()) }
+            val dateFormat = SimpleDateFormat("MMM d", Locale.US)
+
+            for (i in 0 until 7) {
+                val dayStart = cal.timeInMillis
+                val dayEnd = getEndOfDay(dayStart)
+
+                val tasksForDay = tasks.filter { it.dateMillis in dayStart..dayEnd }
+                val completedTasksCount = tasksForDay.count { it.isCompleted }
+
+                val habitsCompletedCount = habitLogs.count { getStartOfDay(it.dateMillis) == dayStart }
+
+                val dayExpenses = finances
+                    .filter { it.type == TransactionType.EXPENSE && it.dateMillis in dayStart..dayEnd }
+                    .sumOf { it.amount }
+
+                val dayNote = notes.firstOrNull { getStartOfDay(it.dateMillis) == dayStart }
+                val mood = dayNote?.moodEmoji ?: "-"
+
+                historyList.add(
+                    DailyPerformanceHistory(
+                        dateMillis = dayStart,
+                        formattedDate = dateFormat.format(Date(dayStart)),
+                        completedTasks = completedTasksCount,
+                        totalTasks = tasksForDay.size,
+                        completedHabits = habitsCompletedCount,
+                        totalExpenses = dayExpenses,
+                        mood = mood
+                    )
+                )
+
+                cal.add(Calendar.DAY_OF_YEAR, -1)
+            }
+
+            historyList
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+        // Overall Streak Calculation
+        overallDailyStreak = combine(allTasks, allHabitLogs) { tasks, habitLogs ->
+            val completedDates = mutableSetOf<Long>()
+            tasks.filter { it.isCompleted }.forEach { completedDates.add(getStartOfDay(it.dateMillis)) }
+            habitLogs.forEach { completedDates.add(getStartOfDay(it.dateMillis)) }
+
+            var streak = 0
+            val cal = Calendar.getInstance().apply { timeInMillis = getStartOfDay(System.currentTimeMillis()) }
+
+            while (true) {
+                val dateToCheck = cal.timeInMillis
+                if (completedDates.contains(dateToCheck)) {
+                    streak++
+                    cal.add(Calendar.DAY_OF_YEAR, -1)
+                } else {
+                    if (streak == 0) {
+                        cal.add(Calendar.DAY_OF_YEAR, -1)
+                        if (completedDates.contains(cal.timeInMillis)) {
+                            streak++
+                            cal.add(Calendar.DAY_OF_YEAR, -1)
+                            continue
+                        }
+                    }
+                    break
+                }
+            }
+            streak
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
+        // Automated Notification Check for Pending Tasks Today
+        viewModelScope.launch {
+            val todayStart = getStartOfDay(System.currentTimeMillis())
+            val todayEnd = getEndOfDay(todayStart)
+            repository.getTasksByDateRange(todayStart, todayEnd).collect { todayTasks ->
+                val pendingToday = todayTasks.filter { !it.isCompleted }
+                if (pendingToday.isNotEmpty()) {
+                    NotificationHelper.sendNotification(
+                        getApplication(),
+                        "Daily Task Reminder",
+                        "You have ${pendingToday.size} pending task(s) scheduled for today."
+                    )
+                }
+            }
+        }
     }
 
     fun toggleTheme() {
         isDarkTheme.value = !isDarkTheme.value
-    }
-
-    fun setThemePreset(preset: ThemePreset) {
-        themePreset.value = preset
     }
 
     fun selectDate(millis: Long) {
@@ -206,14 +334,11 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             )
             repository.insertTask(newTask)
 
-            // Send notification for high priority task
-            if (priority == Priority.HIGH) {
-                NotificationHelper.sendNotification(
-                    getApplication(),
-                    "Tarea de Alta Prioridad Creada",
-                    "Recordatorio: ${newTask.title}"
-                )
-            }
+            NotificationHelper.sendNotification(
+                getApplication(),
+                "Task Scheduled",
+                "Reminder set for: ${newTask.title}"
+            )
         }
     }
 
@@ -252,7 +377,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         endTime: String,
         title: String,
         category: String = "General",
-        colorHex: String = "#2196F3"
+        colorHex: String = "#212121"
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
@@ -286,32 +411,96 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // Gym Exercise Methods
+    fun addGymExercise(dayOfWeek: Int, name: String, setsReps: String = "4x10", category: String = "Chest") {
+        if (name.isBlank()) return
+        viewModelScope.launch {
+            val exercise = GymExercise(
+                dayOfWeek = dayOfWeek,
+                name = name.trim(),
+                setsReps = setsReps.trim().ifBlank { "4x10" },
+                category = category.trim().ifBlank { "Chest" },
+                isCompleted = false
+            )
+            repository.insertGymExercise(exercise)
+        }
+    }
+
+    fun toggleGymExerciseCompleted(exercise: GymExercise) {
+        viewModelScope.launch {
+            repository.updateGymExercise(exercise.copy(isCompleted = !exercise.isCompleted))
+        }
+    }
+
+    fun deleteGymExercise(exercise: GymExercise) {
+        viewModelScope.launch {
+            repository.deleteGymExercise(exercise)
+        }
+    }
+
+    fun applyPredefinedGymRoutine(dayOfWeek: Int, routineFocus: String) {
+        viewModelScope.launch {
+            val exercises = when (routineFocus) {
+                "Chest & Triceps" -> listOf(
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Flat Barbell Bench Press", setsReps = "4 sets x 10 reps", category = "Chest"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Incline Dumbbell Press", setsReps = "4 sets x 12 reps", category = "Chest"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Cable Flyes", setsReps = "3 sets x 15 reps", category = "Chest"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Triceps Pushdowns", setsReps = "4 sets x 12 reps", category = "Triceps"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Parallel Bar Dips", setsReps = "3 sets x failure", category = "Triceps")
+                )
+                "Back & Biceps" -> listOf(
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Pull-ups", setsReps = "4 sets x 8 reps", category = "Back"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Barbell Bent-Over Row", setsReps = "4 sets x 10 reps", category = "Back"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Lat Pulldowns", setsReps = "3 sets x 12 reps", category = "Back"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Barbell Biceps Curl", setsReps = "4 sets x 10 reps", category = "Biceps"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Hammer Curls", setsReps = "3 sets x 12 reps", category = "Biceps")
+                )
+                "Legs & Shoulders" -> listOf(
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Barbell Back Squat", setsReps = "4 sets x 10 reps", category = "Legs"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Leg Press", setsReps = "4 sets x 12 reps", category = "Legs"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Romanian Deadlift", setsReps = "3 sets x 10 reps", category = "Legs"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Seated Overhead Press", setsReps = "4 sets x 10 reps", category = "Shoulders"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Lateral Raises", setsReps = "4 sets x 15 reps", category = "Shoulders")
+                )
+                else -> listOf(
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Treadmill Run / Cardio", setsReps = "20-30 mins", category = "Cardio"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Abdominal Crunches", setsReps = "4 sets x 20 reps", category = "Abs"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Plank Hold", setsReps = "3 sets x 60 secs", category = "Abs")
+                )
+            }
+
+            exercises.forEach { ex ->
+                repository.insertGymExercise(ex)
+            }
+        }
+    }
+
     // Predefined Routines Generator
     fun applyPredefinedRoutine(dayOfWeek: Int, routineType: RoutineType) {
         viewModelScope.launch {
             val presetSlots = when (routineType) {
                 RoutineType.OFICINA -> listOf(
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "07:00", endTime = "08:00", title = "Ejercicio y Desayuno", category = "Ejercicio", colorHex = "#4CAF50"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "08:30", endTime = "13:00", title = "Trabajo Enfoque", category = "Trabajo", colorHex = "#2196F3"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "13:00", endTime = "14:00", title = "Almuerzo y Descanso", category = "Almuerzo", colorHex = "#FF9800"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "14:00", endTime = "18:00", title = "Trabajo y Reuniones", category = "Trabajo", colorHex = "#2196F3"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "18:30", endTime = "20:00", title = "Gimnasio / Deporte", category = "Ejercicio", colorHex = "#4CAF50"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "20:30", endTime = "22:30", title = "Tiempo Libre y Cena", category = "Descanso", colorHex = "#9C27B0")
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "07:00", endTime = "08:00", title = "Workout & Breakfast", category = "Fitness", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "08:30", endTime = "13:00", title = "Deep Work Block", category = "Work", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "13:00", endTime = "14:00", title = "Lunch & Rest", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "14:00", endTime = "18:00", title = "Work & Meetings", category = "Work", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "18:30", endTime = "20:00", title = "Gym / Sports", category = "Fitness", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "20:30", endTime = "22:30", title = "Free Time & Dinner", category = "Personal", colorHex = "#212121")
                 )
                 RoutineType.ESTUDIANTE -> listOf(
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "07:30", endTime = "08:30", title = "Preparación y Café", category = "General", colorHex = "#4CAF50"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "08:30", endTime = "12:30", title = "Clases / Estudio", category = "Estudios", colorHex = "#00BCD4"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "12:30", endTime = "13:30", title = "Almuerzo", category = "Almuerzo", colorHex = "#FF9800"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "14:00", endTime = "17:00", title = "Proyectos y Tareas", category = "Estudios", colorHex = "#00BCD4"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "17:30", endTime = "19:00", title = "Caminata / Deporte", category = "Ejercicio", colorHex = "#4CAF50"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "19:30", endTime = "22:00", title = "Lectura / Descanso", category = "Descanso", colorHex = "#9C27B0")
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "07:30", endTime = "08:30", title = "Morning Prep & Coffee", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "08:30", endTime = "12:30", title = "Lectures & Study", category = "Study", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "12:30", endTime = "13:30", title = "Lunch Break", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "14:00", endTime = "17:00", title = "Projects & Homework", category = "Study", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "17:30", endTime = "19:00", title = "Outdoor Walk / Run", category = "Fitness", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "19:30", endTime = "22:00", title = "Reading & Unwind", category = "Personal", colorHex = "#212121")
                 )
                 RoutineType.FIN_DE_SEMANA -> listOf(
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "09:00", endTime = "10:00", title = "Desayuno y Relax", category = "Descanso", colorHex = "#E91E63"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "10:30", endTime = "12:30", title = "Hobbies / Proyectos Personales", category = "Personal", colorHex = "#9C27B0"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "13:00", endTime = "15:00", title = "Comida en Familia", category = "General", colorHex = "#FF9800"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "15:30", endTime = "18:30", title = "Paseo / Actividad Libre", category = "Personal", colorHex = "#E91E63"),
-                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "19:00", endTime = "22:00", title = "Película / Ocio", category = "Descanso", colorHex = "#9C27B0")
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "09:00", endTime = "10:00", title = "Late Breakfast & Relax", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "10:30", endTime = "12:30", title = "Hobbies / Side Projects", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "13:00", endTime = "15:00", title = "Family Meal", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "15:30", endTime = "18:30", title = "Walk / Free Time", category = "Personal", colorHex = "#212121"),
+                    ScheduleSlot(dayOfWeek = dayOfWeek, startTime = "19:00", endTime = "22:00", title = "Movie / Evening Relaxation", category = "Personal", colorHex = "#212121")
                 )
             }
 
@@ -361,7 +550,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Habit Methods
-    fun addHabit(title: String, category: String = "General", colorHex: String = "#4CAF50") {
+    fun addHabit(title: String, category: String = "General", colorHex: String = "#212121") {
         if (title.isBlank()) return
         viewModelScope.launch {
             val habit = Habit(title = title.trim(), category = category, colorHex = colorHex)
@@ -401,7 +590,6 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                 streak++
                 cal.add(Calendar.DAY_OF_YEAR, -1)
             } else {
-                // If today is not completed yet, check yesterday before stopping streak
                 if (streak == 0) {
                     cal.add(Calendar.DAY_OF_YEAR, -1)
                     if (habitLogsDates.contains(cal.timeInMillis)) {
@@ -429,7 +617,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Saving Goal Methods
-    fun addSavingGoal(title: String, targetAmount: Double, colorHex: String = "#4CAF50") {
+    fun addSavingGoal(title: String, targetAmount: Double, colorHex: String = "#212121") {
         if (title.isBlank() || targetAmount <= 0) return
         viewModelScope.launch {
             val goal = SavingGoal(title = title.trim(), targetAmount = targetAmount, colorHex = colorHex)
@@ -445,10 +633,10 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
             // Also add a finance entry for the savings deposit
             val entry = FinanceEntry(
-                title = "Ahorro: ${goal.title}",
+                title = "Savings: ${goal.title}",
                 amount = depositAmount,
                 type = TransactionType.EXPENSE,
-                category = "Ahorro",
+                category = "Savings",
                 dateMillis = System.currentTimeMillis()
             )
             repository.insertFinanceEntry(entry)
@@ -462,8 +650,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     companion object {
-        val categories = listOf("Todas", "General", "Trabajo", "Personal", "Estudios", "Hogar")
-        val financeCategories = listOf("Renta", "Despensa", "Servicios", "Transporte", "Ocio", "Ahorro", "Otros")
+        val categories = listOf("All", "General", "Work", "Personal", "Study", "Home")
+        val financeCategories = listOf("Rent", "Groceries", "Utilities", "Transport", "Leisure", "Savings", "Other")
 
         fun getStartOfDay(timeMillis: Long): Long {
             val calendar = Calendar.getInstance().apply {
