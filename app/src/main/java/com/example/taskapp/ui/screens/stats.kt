@@ -2,6 +2,8 @@ package com.example.taskapp.ui.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -18,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.taskapp.data.Priority
 import com.example.taskapp.data.TransactionType
+import com.example.taskapp.ui.viewmodel.HistoryPeriod
 import com.example.taskapp.ui.viewmodel.TaskViewModel
 import java.util.Locale
 
@@ -27,7 +30,9 @@ fun StatsScreen(viewModel: TaskViewModel) {
     val allFinanceEntries by viewModel.allFinanceEntries.collectAsState()
     val monthlyBudget by viewModel.monthlyBudget.collectAsState()
     val allScheduleSlots by viewModel.allScheduleSlots.collectAsState()
-    val historicalPerformance by viewModel.historicalPerformance.collectAsState()
+
+    val selectedHistoryPeriod by viewModel.selectedHistoryPeriod.collectAsState()
+    val periodComplianceHistory by viewModel.periodComplianceHistory.collectAsState()
 
     var selectedSectionIndex by remember { mutableIntStateOf(0) }
     val sectionTabs = listOf("Overview", "Tasks", "Finances", "Schedule", "History")
@@ -68,16 +73,24 @@ fun StatsScreen(viewModel: TaskViewModel) {
             .fillMaxSize()
             .padding(top = 8.dp)
     ) {
-        // Section Tabs
-        PrimaryTabRow(
+        // Scrollable Section Tabs (Prevents text wrapping onto multiple lines)
+        PrimaryScrollableTabRow(
             selectedTabIndex = selectedSectionIndex,
+            edgePadding = 16.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             sectionTabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedSectionIndex == index,
                     onClick = { selectedSectionIndex = index },
-                    text = { Text(title, fontSize = 11.sp, fontWeight = if (selectedSectionIndex == index) FontWeight.Bold else FontWeight.Normal) }
+                    text = {
+                        Text(
+                            text = title,
+                            fontSize = 13.sp,
+                            fontWeight = if (selectedSectionIndex == index) FontWeight.Bold else FontWeight.Normal,
+                            maxLines = 1
+                        )
+                    }
                 )
             }
         }
@@ -265,44 +278,82 @@ fun StatsScreen(viewModel: TaskViewModel) {
                 }
 
                 4 -> {
-                    // History Log (Past 7 Days)
-                    Text("7-Day Performance History", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                    // History Log with Period Selector (Weekly, Monthly, Yearly)
+                    Text("Compliance History & Analytics", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = primaryColor)
 
-                    historicalPerformance.forEach { history ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(history.formattedDate, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = primaryColor)
-                                    Surface(
-                                        color = MaterialTheme.colorScheme.secondaryContainer,
-                                        shape = MaterialTheme.shapes.extraSmall
-                                    ) {
-                                        Text(
-                                            text = "Mood: ${history.mood}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                        )
+                    // Period Selector Chips
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(HistoryPeriod.entries.toTypedArray()) { period ->
+                            FilterChip(
+                                selected = selectedHistoryPeriod == period,
+                                onClick = { viewModel.selectedHistoryPeriod.value = period },
+                                label = { Text(period.label) }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    if (periodComplianceHistory.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                            Text("No historical compliance data available.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    } else {
+                        periodComplianceHistory.forEach { history ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text(
+                                        text = history.title,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = primaryColor
+                                    )
+
+                                    Spacer(modifier = Modifier.height(10.dp))
+
+                                    // Task Compliance Bar
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Task Completion", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Text("${history.taskCompletionPercentage}% (${history.completedTasks}/${history.totalTasks})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primaryColor)
                                     }
-                                }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LinearProgressIndicator(
+                                        progress = { (history.taskCompletionPercentage / 100f).coerceIn(0f, 1f) },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                                        color = primaryColor,
+                                        trackColor = trackColor,
+                                        strokeCap = StrokeCap.Round
+                                    )
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Tasks: ${history.completedTasks}/${history.totalTasks}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("Habits Done: ${history.completedHabits}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text("Expenses: $${String.format(Locale.US, "%.2f", history.totalExpenses)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    // Habit Completion Bar
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Habit Completion", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Text("${history.habitCompletionPercentage}%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    LinearProgressIndicator(
+                                        progress = { (history.habitCompletionPercentage / 100f).coerceIn(0f, 1f) },
+                                        modifier = Modifier.fillMaxWidth().height(6.dp),
+                                        color = primaryColor,
+                                        trackColor = trackColor,
+                                        strokeCap = StrokeCap.Round
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Expenses Total
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Period Expenses", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text("-$${String.format(Locale.US, "%.2f", history.totalExpenses)}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = primaryColor)
+                                    }
                                 }
                             }
                         }

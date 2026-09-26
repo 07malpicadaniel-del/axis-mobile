@@ -33,13 +33,13 @@
 - **Balance & Progress**: Tracks total expenses, remaining balance, and budget usage percentage.
 - **Savings Goals**: Target tracking (*Emergency Fund, Laptop, Trip*) with direct deposit actions.
 
-### 5. 📊 Analytics & 7-Day Performance History Log
+### 5. 📊 Analytics & Period Compliance History (Weekly / Monthly / Yearly)
 Control dashboard organized into 5 tabs:
 - **Overview**: Executive summary of task completion %, schedule adherence %, and remaining budget.
 - **Tasks**: Circular Canvas completion ring and priority distribution.
 - **Finances**: Expense breakdown by category and budget consumption bar.
 - **Schedule**: Routine adherence rate and time distribution across categories.
-- **History (7-Day Performance Log)**: Historical performance log for each of the past 7 days displaying completed tasks, habits done, expenses, and recorded mood.
+- **History (Compliance Log)**: Historical compliance log with Period Selectors (**Weekly**, **Monthly**, **Yearly**) showing task completion %, habit completion %, and period expenses over time.
 
 ### 6. ⚙️ Settings, Monochrome Theme & Notifications
 - **100% Monochrome Black & White Theme**: Pure minimal design without color distractions, with explicitly defined color roles for containers, FABs, chips, and top bars.

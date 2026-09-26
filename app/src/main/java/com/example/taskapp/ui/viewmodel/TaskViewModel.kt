@@ -25,14 +25,20 @@ enum class RoutineType(val title: String, val description: String) {
     FIN_DE_SEMANA("Weekend Routine", "Hobbies, family time, outdoor activities, and leisure.")
 }
 
-data class DailyPerformanceHistory(
-    val dateMillis: Long,
-    val formattedDate: String,
+enum class HistoryPeriod(val label: String) {
+    WEEK("Weekly"),
+    MONTH("Monthly"),
+    YEAR("Yearly")
+}
+
+data class PeriodComplianceHistory(
+    val title: String,
+    val taskCompletionPercentage: Int,
     val completedTasks: Int,
     val totalTasks: Int,
-    val completedHabits: Int,
-    val totalExpenses: Double,
-    val mood: String
+    val scheduleAdherencePercentage: Int,
+    val habitCompletionPercentage: Int,
+    val totalExpenses: Double
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -79,11 +85,12 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     // Daily Note State
     val currentDailyNote: StateFlow<DailyNote?>
 
-    // Historical Performance Log Flow (Past 7 Days)
-    val historicalPerformance: StateFlow<List<DailyPerformanceHistory>>
-
     // Overall Active Daily Streak
     val overallDailyStreak: StateFlow<Int>
+
+    // Period Compliance History (Weekly, Monthly, Yearly)
+    val selectedHistoryPeriod = MutableStateFlow(HistoryPeriod.WEEK)
+    val periodComplianceHistory: StateFlow<List<PeriodComplianceHistory>>
 
     init {
         val database = TaskDatabase.getDatabase(application)
@@ -208,49 +215,129 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = null
         )
 
-        // Calculate 7-day Historical Performance
-        historicalPerformance = combine(
+        // Period Compliance History Flow
+        periodComplianceHistory = combine(
             allTasks,
             allHabitLogs,
             allFinanceEntries,
-            repository.allDailyNotes
-        ) { tasks, habitLogs, finances, notes ->
-            val historyList = mutableListOf<DailyPerformanceHistory>()
+            selectedHistoryPeriod
+        ) { tasks, habitLogs, finances, period ->
+            val list = mutableListOf<PeriodComplianceHistory>()
             val cal = Calendar.getInstance().apply { timeInMillis = getStartOfDay(System.currentTimeMillis()) }
-            val dateFormat = SimpleDateFormat("MMM d", Locale.US)
 
-            for (i in 0 until 7) {
-                val dayStart = cal.timeInMillis
-                val dayEnd = getEndOfDay(dayStart)
+            val dateFormatWeekly = SimpleDateFormat("MMM d", Locale.US)
+            val dateFormatMonthly = SimpleDateFormat("MMMM yyyy", Locale.US)
+            val dateFormatYearly = SimpleDateFormat("yyyy", Locale.US)
 
-                val tasksForDay = tasks.filter { it.dateMillis in dayStart..dayEnd }
-                val completedTasksCount = tasksForDay.count { it.isCompleted }
+            when (period) {
+                HistoryPeriod.WEEK -> {
+                    for (w in 0 until 4) {
+                        val endOfWeek = cal.timeInMillis + (24 * 60 * 60 * 1000L) - 1
+                        cal.add(Calendar.DAY_OF_YEAR, -6)
+                        val startOfWeek = cal.timeInMillis
 
-                val habitsCompletedCount = habitLogs.count { getStartOfDay(it.dateMillis) == dayStart }
+                        val tasksInWeek = tasks.filter { it.dateMillis in startOfWeek..endOfWeek }
+                        val tasksCompleted = tasksInWeek.count { it.isCompleted }
+                        val taskPct = if (tasksInWeek.isNotEmpty()) (tasksCompleted * 100) / tasksInWeek.size else 0
 
-                val dayExpenses = finances
-                    .filter { it.type == TransactionType.EXPENSE && it.dateMillis in dayStart..dayEnd }
-                    .sumOf { it.amount }
+                        val habitsLogged = habitLogs.count { it.dateMillis in startOfWeek..endOfWeek }
+                        val habitPct = (habitsLogged * 10).coerceAtMost(100)
 
-                val dayNote = notes.firstOrNull { getStartOfDay(it.dateMillis) == dayStart }
-                val mood = dayNote?.moodEmoji ?: "-"
+                        val expenses = finances.filter { it.type == TransactionType.EXPENSE && it.dateMillis in startOfWeek..endOfWeek }.sumOf { it.amount }
 
-                historyList.add(
-                    DailyPerformanceHistory(
-                        dateMillis = dayStart,
-                        formattedDate = dateFormat.format(Date(dayStart)),
-                        completedTasks = completedTasksCount,
-                        totalTasks = tasksForDay.size,
-                        completedHabits = habitsCompletedCount,
-                        totalExpenses = dayExpenses,
-                        mood = mood
-                    )
-                )
+                        val title = "Week ${w + 1} (${dateFormatWeekly.format(Date(startOfWeek))} - ${dateFormatWeekly.format(Date(endOfWeek))})"
+                        list.add(
+                            PeriodComplianceHistory(
+                                title = title,
+                                taskCompletionPercentage = taskPct,
+                                completedTasks = tasksCompleted,
+                                totalTasks = tasksInWeek.size,
+                                scheduleAdherencePercentage = taskPct,
+                                habitCompletionPercentage = habitPct,
+                                totalExpenses = expenses
+                            )
+                        )
 
-                cal.add(Calendar.DAY_OF_YEAR, -1)
+                        cal.add(Calendar.DAY_OF_YEAR, -1)
+                    }
+                }
+                HistoryPeriod.MONTH -> {
+                    for (m in 0 until 6) {
+                        val monthCal = (cal.clone() as Calendar).apply {
+                            set(Calendar.DAY_OF_MONTH, 1)
+                        }
+                        val startOfMonth = monthCal.timeInMillis
+                        val endOfMonth = (monthCal.clone() as Calendar).apply {
+                            set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+                            set(Calendar.HOUR_OF_DAY, 23)
+                            set(Calendar.MINUTE, 59)
+                            set(Calendar.SECOND, 59)
+                        }.timeInMillis
+
+                        val tasksInMonth = tasks.filter { it.dateMillis in startOfMonth..endOfMonth }
+                        val tasksCompleted = tasksInMonth.count { it.isCompleted }
+                        val taskPct = if (tasksInMonth.isNotEmpty()) (tasksCompleted * 100) / tasksInMonth.size else 0
+
+                        val habitsLogged = habitLogs.count { it.dateMillis in startOfMonth..endOfMonth }
+                        val habitPct = (habitsLogged * 5).coerceAtMost(100)
+
+                        val expenses = finances.filter { it.type == TransactionType.EXPENSE && it.dateMillis in startOfMonth..endOfMonth }.sumOf { it.amount }
+
+                        list.add(
+                            PeriodComplianceHistory(
+                                title = dateFormatMonthly.format(Date(startOfMonth)),
+                                taskCompletionPercentage = taskPct,
+                                completedTasks = tasksCompleted,
+                                totalTasks = tasksInMonth.size,
+                                scheduleAdherencePercentage = taskPct,
+                                habitCompletionPercentage = habitPct,
+                                totalExpenses = expenses
+                            )
+                        )
+
+                        cal.add(Calendar.MONTH, -1)
+                    }
+                }
+                HistoryPeriod.YEAR -> {
+                    for (y in 0 until 3) {
+                        val yearCal = (cal.clone() as Calendar).apply {
+                            set(Calendar.DAY_OF_YEAR, 1)
+                        }
+                        val startOfYear = yearCal.timeInMillis
+                        val endOfYear = (yearCal.clone() as Calendar).apply {
+                            set(Calendar.DAY_OF_YEAR, getActualMaximum(Calendar.DAY_OF_YEAR))
+                            set(Calendar.HOUR_OF_DAY, 23)
+                            set(Calendar.MINUTE, 59)
+                            set(Calendar.SECOND, 59)
+                        }.timeInMillis
+
+                        val tasksInYear = tasks.filter { it.dateMillis in startOfYear..endOfYear }
+                        val tasksCompleted = tasksInYear.count { it.isCompleted }
+                        val taskPct = if (tasksInYear.isNotEmpty()) (tasksCompleted * 100) / tasksInYear.size else 0
+
+                        val habitsLogged = habitLogs.count { it.dateMillis in startOfYear..endOfYear }
+                        val habitPct = (habitsLogged * 2).coerceAtMost(100)
+
+                        val expenses = finances.filter { it.type == TransactionType.EXPENSE && it.dateMillis in startOfYear..endOfYear }.sumOf { it.amount }
+
+                        list.add(
+                            PeriodComplianceHistory(
+                                title = "Year ${dateFormatYearly.format(Date(startOfYear))}",
+                                taskCompletionPercentage = taskPct,
+                                completedTasks = tasksCompleted,
+                                totalTasks = tasksInYear.size,
+                                scheduleAdherencePercentage = taskPct,
+                                habitCompletionPercentage = habitPct,
+                                totalExpenses = expenses
+                            )
+                        )
+
+                        cal.add(Calendar.YEAR, -1)
+                    }
+                }
             }
 
-            historyList
+            list
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
@@ -458,7 +545,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
                 "Legs & Shoulders" -> listOf(
                     GymExercise(dayOfWeek = dayOfWeek, name = "Barbell Back Squat", setsReps = "4 sets x 10 reps", category = "Legs"),
                     GymExercise(dayOfWeek = dayOfWeek, name = "Leg Press", setsReps = "4 sets x 12 reps", category = "Legs"),
-                    GymExercise(dayOfWeek = dayOfWeek, name = "Romanian Deadlift", setsReps = "3 sets x 10 reps", category = "Legs"),
+                    GymExercise(dayOfWeek = dayOfWeek, name = "Romanian Deadlift", setsReps = "3 series x 10 reps", category = "Legs"),
                     GymExercise(dayOfWeek = dayOfWeek, name = "Seated Overhead Press", setsReps = "4 sets x 10 reps", category = "Shoulders"),
                     GymExercise(dayOfWeek = dayOfWeek, name = "Lateral Raises", setsReps = "4 sets x 15 reps", category = "Shoulders")
                 )
